@@ -48,6 +48,9 @@ from allensdk.brain_observatory.behavior.data_objects.metadata.behavior_metadata
 from allensdk.brain_observatory.behavior.data_objects.metadata.behavior_metadata.date_of_acquisition import (  # noqa: E501
     DateOfAcquisition,
 )
+from allensdk.brain_observatory.behavior.data_objects.metadata.behavior_metadata.project_code import (  # noqa: E501
+    ProjectCode,
+)
 from allensdk.brain_observatory.behavior.data_objects.rewards import Rewards
 from allensdk.brain_observatory.behavior.data_objects.stimuli.presentations import (  # noqa: E501
     Presentations,
@@ -354,31 +357,36 @@ class BehaviorSession(
         date_of_acquisition: Optional[DateOfAcquisition] = None,
         eye_tracking_z_threshold: float = 3.0,
         eye_tracking_dilation_frames: int = 2,
+        load_stimulus_movie: bool = True
     ) -> "BehaviorSession":
         """
 
         Parameters
         ----------
-        behavior_session_id
+        behavior_session_id : int
             Behavior session id
-        lims_db
+        lims_db : PostgresQueryMixin, Optional
             Database connection. If not provided will create a new one.
-        sync_file:
+        sync_file : SyncFile, Optional
             If provided, will be used to compute the stimulus timestamps
             associated with this session. Otherwise, the stimulus timestamps
             will be computed from the stimulus file.
-        monitor_delay
+        monitor_delay : float, Optional
             Monitor delay. If not provided, will use an estimate.
             To provide this value, see for example
             allensdk.brain_observatory.behavior.data_objects.stimuli.util.
             calculate_monitor_delay
-        date_of_acquisition
+        date_of_acquisition : DateOfAcquisition, Optional
             Date of acquisition. If not provided, will read from
             behavior_sessions table.
-        eye_tracking_z_threshold
-            See `BehaviorSession.from_nwb`
-        eye_tracking_dilation_frames
-            See `BehaviorSession.from_nwb`
+        eye_tracking_z_threshold : float
+            See `BehaviorSession.from_nwb`, default 3.0
+        eye_tracking_dilation_frames : int
+            See `BehaviorSession.from_nwb`, default 2
+        load_stimulus_movie : bool
+            Whether to load the stimulus movie (e.g natrual_movie_one) as
+            part of loading stimuli. Default True.
+
         Returns
         -------
         `BehaviorSession` instance
@@ -442,6 +450,10 @@ class BehaviorSession(
             stimulus_file_lookup=stimulus_file_lookup,
             sync_file=sync_file,
             monitor_delay=monitor_delay,
+            project_code=ProjectCode.from_lims(
+                behavior_session_id=behavior_session_id.value, lims_db=lims_db
+            ),
+            load_stimulus_movie=load_stimulus_movie
         )
 
         if date_of_acquisition is None:
@@ -1064,6 +1076,9 @@ class BehaviorSession(
         for a given duration, typically 250 ms) and whose columns are
         presentation characteristics.
 
+        Adds trials_id to the stimulus table if the column is not already
+        present.
+
         Returns
         -------
         pd.DataFrame
@@ -1098,17 +1113,17 @@ class BehaviorSession(
         table = self._stimuli.presentations.value
         table = table.drop(columns=["image_set", "index"], errors="ignore")
         table = table.rename(columns={"stop_time": "end_time"})
-        # Backwards compatibility for data generated without the needed
-        # ``stimulus_block`` column in the table.
-        if "stimulus_block" in table.columns:
+
+        if "trials_id" not in table.columns \
+                and 'stimulus_block' in table.columns:
             table["trials_id"] = compute_trials_id_for_stimulus(
                 table, self.trials
             )
         return table
 
     @property
-    def stimulus_templates(self) -> pd.DataFrame:
-        """Get stimulus templates (movies, scenes) for behavior session.
+    def stimulus_templates(self) -> Optional[pd.DataFrame]:
+        """Get stimulus templates (scenes) for behavior session.
 
         Returns
         -------
@@ -1126,7 +1141,42 @@ class BehaviorSession(
                     image array of warped stimulus image
 
         """
-        return self._stimuli.templates.value.to_dataframe()
+        if self._stimuli.templates.image_template_key is not None:
+            return self._stimuli.templates.value[
+                self._stimuli.templates.image_template_key
+            ].to_dataframe()
+        else:
+            return None
+
+    @property
+    def stimulus_fingerprint_movie_template(self) -> Optional[pd.DataFrame]:
+        """Get stimulus templates movie for the behavior session.
+
+        Returns None if no stimulus movie is available.
+
+        Returns
+        -------
+        pd.DataFrame or None
+            A pandas DataFrame object containing the individual frames for the
+            movie shown during this experiment.
+
+            dataframe columns:
+                frame_number [index]: (int)
+                    Frame number in movie
+                unwarped: (array of int)
+                    image array of unwarped stimulus movie frame
+                warped: (array of int)
+                    image array of warped stimulus movie frame
+
+        """
+        if self._stimuli.templates.fingerprint_movie_template_key is not None:
+            return self._stimuli.templates.value[
+                self._stimuli.templates.fingerprint_movie_template_key
+            ].to_dataframe(
+                index_name='frame_number',
+                index_type='int')
+        else:
+            return None
 
     @property
     def stimulus_timestamps(self) -> np.ndarray:
@@ -1359,7 +1409,10 @@ class BehaviorSession(
         behavior_session_id: int,
         sync_file: Optional[SyncFile],
         monitor_delay: float,
+        trials: Trials,
         stimulus_presentation_columns: Optional[List[str]] = None,
+        project_code: Optional[ProjectCode] = None,
+        load_stimulus_movie: bool = False
     ) -> Stimuli:
         """
         Construct the Stimuli data object for this session
@@ -1376,6 +1429,9 @@ class BehaviorSession(
             stimulus_file=stimulus_file_lookup.behavior_stimulus_file,
             stimulus_timestamps=stimulus_timestamps,
             presentation_columns=stimulus_presentation_columns,
+            project_code=project_code,
+            trials=trials,
+            load_stimulus_movie=load_stimulus_movie
         )
 
     @classmethod
@@ -1452,8 +1508,10 @@ class BehaviorSession(
         behavior_session_id: int,
         sync_file: Optional[SyncFile],
         monitor_delay: float,
-        include_stimuli=True,
+        include_stimuli: bool = True,
         stimulus_presentation_columns: Optional[List[str]] = None,
+        project_code: Optional[ProjectCode] = None,
+        load_stimulus_movie: bool = False
     ):
         """Helper method to read data from stimulus file"""
 
@@ -1473,17 +1531,6 @@ class BehaviorSession(
             monitor_delay=monitor_delay,
         )
 
-        if include_stimuli:
-            stimuli = cls._read_stimuli(
-                stimulus_file_lookup=stimulus_file_lookup,
-                behavior_session_id=behavior_session_id,
-                sync_file=sync_file,
-                monitor_delay=monitor_delay,
-                stimulus_presentation_columns=stimulus_presentation_columns,
-            )
-        else:
-            stimuli = None
-
         trials = cls._read_trials(
             stimulus_file_lookup=stimulus_file_lookup,
             sync_file=sync_file,
@@ -1491,6 +1538,20 @@ class BehaviorSession(
             licks=licks,
             rewards=rewards,
         )
+
+        if include_stimuli:
+            stimuli = cls._read_stimuli(
+                stimulus_file_lookup=stimulus_file_lookup,
+                behavior_session_id=behavior_session_id,
+                sync_file=sync_file,
+                monitor_delay=monitor_delay,
+                trials=trials,
+                stimulus_presentation_columns=stimulus_presentation_columns,
+                project_code=project_code,
+                load_stimulus_movie=load_stimulus_movie
+            )
+        else:
+            stimuli = None
 
         task_parameters = TaskParameters.from_stimulus_file(
             stimulus_file=stimulus_file_lookup.behavior_stimulus_file
@@ -1515,7 +1576,6 @@ class BehaviorSession(
         eye_tracking_metadata_file: Optional[EyeTrackingMetadataFile] = None,
         eye_tracking_video: Optional[EyeTrackingVideo] = None,
     ) -> EyeTrackingTable:
-
         # this is possible if instantiating from_lims
         if sync_file is None:
             msg = (

@@ -1,29 +1,58 @@
-import pandas as pd
 from typing import Iterable
 
+import pandas as pd
+from allensdk.brain_observatory.behavior.behavior_ophys_experiment import (
+    BehaviorOphysExperiment,
+)
 from allensdk.brain_observatory.behavior.behavior_project_cache.project_apis.abcs import (  # noqa: E501
     BehaviorProjectBase,
+)
+from allensdk.brain_observatory.behavior.behavior_project_cache.project_apis.data_io.project_cloud_api_base import (  # noqa: E501
+    ProjectCloudApiBase,
 )
 from allensdk.brain_observatory.behavior.behavior_session import (
     BehaviorSession,
 )
-from allensdk.brain_observatory.behavior.behavior_ophys_experiment import (
-    BehaviorOphysExperiment,
-)
 from allensdk.core.utilities import literal_col_eval
-from allensdk.brain_observatory.behavior.behavior_project_cache.project_apis.data_io.project_cloud_api_base import (  # noqa: E501
-    ProjectCloudApiBase,
+from allensdk.core.dataframe_utils import (
+    enforce_df_int_typing
 )
 
 COL_EVAL_LIST = ["ophys_experiment_id", "ophys_container_id", "driver_line"]
+INTEGER_COLUMNS = ["session_number", "prior_exposures_to_image_set",
+                   "ophys_session_id", "imaging_plane_group_count",
+                   "imaging_plane_group", "targeted_areas",
+                   "num_depths_per_area", "num_targeted_structures"]
+
+
+def sanitize_data_columns(
+    input_csv_path: str, dtype_convert: dict = None
+) -> pd.DataFrame:
+    """Given an input csv path, parse the data and convert columns.
+
+    Parameters
+    ----------
+    input_csv_path : str
+        Path to csv file
+    dtype_convert :  dict
+        Dictionary of column -> type mappings to enforce for pandas load of the
+        csv file.
+
+    Returns
+    -------
+    output_table : pandas.DataFrame
+        Parsed DataFrame
+    """
+    return literal_col_eval(
+        pd.read_csv(input_csv_path, dtype=dtype_convert),
+        columns=COL_EVAL_LIST,
+    )
 
 
 class BehaviorProjectCloudApi(BehaviorProjectBase, ProjectCloudApiBase):
-
     MANIFEST_COMPATIBILITY = ["1.0.0", "2.0.0"]
 
     def _load_manifest_tables(self):
-
         expected_metadata = set(
             [
                 "behavior_session_table",
@@ -86,7 +115,8 @@ class BehaviorProjectCloudApi(BehaviorProjectBase, ProjectCloudApiBase):
                 f" there are {row.shape[0]} entries."
             )
         row = row.squeeze()
-        has_file_id = not pd.isna(row[self.cache.file_id_column])
+        has_file_id = (not pd.isna(row[self.cache.file_id_column])
+                       and row[self.cache.file_id_column] > 0)
         if not has_file_id:
             oeid = row.ophys_experiment_id[0]
             row = self._ophys_experiment_table.query(f"index=={oeid}")
@@ -128,11 +158,12 @@ class BehaviorProjectCloudApi(BehaviorProjectBase, ProjectCloudApiBase):
         session_table_path = self._get_metadata_path(
             fname="ophys_session_table"
         )
-        df = literal_col_eval(
-            pd.read_csv(session_table_path, dtype={"mouse_id": str}),
-            columns=COL_EVAL_LIST,
+        df = sanitize_data_columns(session_table_path, {"mouse_id": str})
+        # Add UTC to match DateOfAcquisition object.
+        df["date_of_acquisition"] = pd.to_datetime(
+            df["date_of_acquisition"], utc="True"
         )
-        df["date_of_acquisition"] = pd.to_datetime(df["date_of_acquisition"])
+        df = enforce_df_int_typing(df, INTEGER_COLUMNS)
         self._ophys_session_table = df.set_index("ophys_session_id")
 
     def get_ophys_session_table(self) -> pd.DataFrame:
@@ -152,11 +183,12 @@ class BehaviorProjectCloudApi(BehaviorProjectBase, ProjectCloudApiBase):
         session_table_path = self._get_metadata_path(
             fname="behavior_session_table"
         )
-        df = literal_col_eval(
-            pd.read_csv(session_table_path, dtype={"mouse_id": str}),
-            columns=COL_EVAL_LIST,
+        df = sanitize_data_columns(session_table_path, {"mouse_id": str})
+        # Add UTC to match DateOfAcquisition object.
+        df["date_of_acquisition"] = pd.to_datetime(
+            df["date_of_acquisition"], utc="True"
         )
-        df["date_of_acquisition"] = pd.to_datetime(df["date_of_acquisition"])
+        df = enforce_df_int_typing(df, INTEGER_COLUMNS)
 
         self._behavior_session_table = df.set_index("behavior_session_id")
 
@@ -181,21 +213,19 @@ class BehaviorProjectCloudApi(BehaviorProjectBase, ProjectCloudApiBase):
         experiment_table_path = self._get_metadata_path(
             fname="ophys_experiment_table"
         )
-        df = literal_col_eval(
-            pd.read_csv(experiment_table_path, dtype={"mouse_id": str}),
-            columns=COL_EVAL_LIST,
+        df = sanitize_data_columns(experiment_table_path, {"mouse_id": str})
+        # Add UTC to match DateOfAcquisition object.
+        df["date_of_acquisition"] = pd.to_datetime(
+            df["date_of_acquisition"], utc="True"
         )
-        df["date_of_acquisition"] = pd.to_datetime(df["date_of_acquisition"])
-
+        df = enforce_df_int_typing(df, INTEGER_COLUMNS)
         self._ophys_experiment_table = df.set_index("ophys_experiment_id")
 
     def _get_ophys_cells_table(self):
         ophys_cells_table_path = self._get_metadata_path(
             fname="ophys_cells_table"
         )
-        df = literal_col_eval(
-            pd.read_csv(ophys_cells_table_path), columns=COL_EVAL_LIST
-        )
+        df = sanitize_data_columns(ophys_cells_table_path)
         # NaN's for invalid cells force this to float, push to int
         df["cell_specimen_id"] = pd.array(
             df["cell_specimen_id"], dtype="Int64"
