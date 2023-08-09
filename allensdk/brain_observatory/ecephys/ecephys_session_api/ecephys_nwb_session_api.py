@@ -8,7 +8,7 @@ import xarray as xr
 import pynwb
 
 from .ecephys_session_api import EcephysSessionApi
-# ! from allensdk.brain_observatory.nwb.nwb_api import NwbApi
+from allensdk.brain_observatory.nwb.nwb_api import NwbApi
 # ! import \
     # allensdk.brain_observatory.ecephys.nwb  # noqa Necessary to import pyNWB
 # namespaces
