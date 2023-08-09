@@ -112,7 +112,7 @@ def test_request_timeout(api):
     stream_mock.assert_called_with(response_mock, path=open_mock.return_value)
     get_mock.assert_called_once_with('http://example.com/yo.jpg',
                                      stream=True,
-                                     timeout=(9.05, 31.1))
+                                     timeout=(9.05, 301.1))
     open_mock.assert_called_once_with('/tmp/testfile', 'wb')
     os_remove.assert_called_once_with('/tmp/testfile')
 
