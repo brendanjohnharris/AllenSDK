@@ -394,7 +394,7 @@ class Api(object):
         return response.content
 
 
-def stream_zip_directory_over_http(url, directory, members=None, timeout=(9.05, 301.1)):
+def stream_zip_directory_over_http(url, directory, members=None, timeout=(9.05, 31.1)):
     ''' Supply an http get request and stream the response to a file.
 
     Parameters
@@ -421,7 +421,7 @@ def stream_zip_directory_over_http(url, directory, members=None, timeout=(9.05, 
     zipper.close()
 
 
-def stream_file_over_http(url, file_path, timeout=(9.05, 301.1)):
+def stream_file_over_http(url, file_path, timeout=(9.05, 31.1)):
     ''' Supply an http get request and stream the response to a file.
 
     Parameters
