@@ -15,87 +15,87 @@ from allensdk.brain_observatory.behavior.image_api import ImageApi
 # pynwb.load_namespaces(str(namespace_path))
 
 
-class NwbApi:
+# class NwbApi:
 
-    __slots__ = ('path', '_nwbfile')
+#     __slots__ = ('path', '_nwbfile')
 
-    @property
-    def nwbfile(self):
-        if hasattr(self, '_nwbfile'):
-            return self._nwbfile
+#     @property
+#     def nwbfile(self):
+#         if hasattr(self, '_nwbfile'):
+#             return self._nwbfile
 
-        io = pynwb.NWBHDF5IO(self.path, 'r')
-        return io.read()
+#         io = pynwb.NWBHDF5IO(self.path, 'r')
+#         return io.read()
 
-    def __init__(self, path, **kwargs):
-        ''' Reads data for a single Brain Observatory session from an NWB 2.0 file
-        '''
+#     def __init__(self, path, **kwargs):
+#         ''' Reads data for a single Brain Observatory session from an NWB 2.0 file
+#         '''
 
-        self.path = path
+#         self.path = path
 
-    @classmethod
-    def from_nwbfile(cls, nwbfile, **kwargs):
+#     @classmethod
+#     def from_nwbfile(cls, nwbfile, **kwargs):
 
-        obj = cls(path=None, **kwargs)
-        obj._nwbfile = nwbfile
+#         obj = cls(path=None, **kwargs)
+#         obj._nwbfile = nwbfile
 
-        return obj
+#         return obj
 
-    @classmethod
-    def from_path(cls, path, **kwargs):
-        with open(path, 'r'):
-            pass
+#     @classmethod
+#     def from_path(cls, path, **kwargs):
+#         with open(path, 'r'):
+#             pass
 
-        return cls(path=path, **kwargs)
+#         return cls(path=path, **kwargs)
 
-    def get_running_speed(self, lowpass=True) -> RunningSpeed:
-        """
-        Gets the running speed
-        Parameters
-        ----------
-        lowpass: bool
-            Whether to return the running speed with lowpass filter applied
-            or without
+#     def get_running_speed(self, lowpass=True) -> RunningSpeed:
+#         """
+#         Gets the running speed
+#         Parameters
+#         ----------
+#         lowpass: bool
+#             Whether to return the running speed with lowpass filter applied
+#             or without
 
-        Returns
-        -------
-        RunningSpeed:
-            The running speed
-        """
+#         Returns
+#         -------
+#         RunningSpeed:
+#             The running speed
+#         """
 
-        interface_name = 'speed' if lowpass else 'speed_unfiltered'
-        values = self.nwbfile.modules['running'].get_data_interface(
-            interface_name).data[:]
-        timestamps = self.nwbfile.modules['running'].get_data_interface(
-            interface_name).timestamps[:]
+#         interface_name = 'speed' if lowpass else 'speed_unfiltered'
+#         values = self.nwbfile.modules['running'].get_data_interface(
+#             interface_name).data[:]
+#         timestamps = self.nwbfile.modules['running'].get_data_interface(
+#             interface_name).timestamps[:]
 
-        return RunningSpeed(
-            timestamps=timestamps,
-            values=values,
-        )
+#         return RunningSpeed(
+#             timestamps=timestamps,
+#             values=values,
+#         )
 
-    def get_stimulus_presentations(self) -> pd.DataFrame:
-        presentations = Presentations.from_nwb(nwbfile=self.nwbfile,
-                                               add_is_change=False)
-        return presentations.value
+#     def get_stimulus_presentations(self) -> pd.DataFrame:
+#         presentations = Presentations.from_nwb(nwbfile=self.nwbfile,
+#                                                add_is_change=False)
+#         return presentations.value
 
-    def get_invalid_times(self) -> pd.DataFrame:
+#     def get_invalid_times(self) -> pd.DataFrame:
 
-        container = self.nwbfile.invalid_times
-        if container:
-            return container.to_dataframe()
-        else:
-            return pd.DataFrame()
+#         container = self.nwbfile.invalid_times
+#         if container:
+#             return container.to_dataframe()
+#         else:
+#             return pd.DataFrame()
 
-    def get_image(self, name, module, image_api=None) -> sitk.Image:
+#     def get_image(self, name, module, image_api=None) -> sitk.Image:
 
-        if image_api is None:
-            image_api = ImageApi
+#         if image_api is None:
+#             image_api = ImageApi
 
-        nwb_img = self.nwbfile.modules[module].get_data_interface(
-            'images')[name]
-        data = nwb_img.data
-        resolution = nwb_img.resolution  # px/cm
-        spacing = [resolution * 10, resolution * 10]
+#         nwb_img = self.nwbfile.modules[module].get_data_interface(
+#             'images')[name]
+#         data = nwb_img.data
+#         resolution = nwb_img.resolution  # px/cm
+#         spacing = [resolution * 10, resolution * 10]
 
-        return ImageApi.serialize(data, spacing, 'mm')
+#         return ImageApi.serialize(data, spacing, 'mm')
