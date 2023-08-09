@@ -19,7 +19,7 @@ class NwbApi:
         if hasattr(self, '_nwbfile'):
             return self._nwbfile
 
-        io = pynwb.NWBHDF5IO(self.path, 'r', load_namespaces=True)
+        io = pynwb.NWBHDF5IO(self.path, 'r')
         return io.read()
 
     def __init__(self, path, **kwargs):

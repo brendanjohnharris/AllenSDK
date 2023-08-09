@@ -35,7 +35,7 @@
 #
 import logging
 
-__version__ = '2.16.4'
+__version__ = '2.99.0'
 
 
 try:
