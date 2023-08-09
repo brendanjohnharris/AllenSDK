@@ -10,12 +10,12 @@ from allensdk.brain_observatory.behavior.data_objects.stimuli.presentations \
 from allensdk.brain_observatory.running_speed import RunningSpeed
 from allensdk.brain_observatory.behavior.image_api import ImageApi
 
-# namespace_path = Path(__file__).parent / \
+# ! namespace_path = Path(__file__).parent / \
 #                  'ndx-aibs-behavior-ophys.namespace.yaml'
-# pynwb.load_namespaces(str(namespace_path))
+# ! pynwb.load_namespaces(str(namespace_path))
 
 
-# class NwbApi:
+# ! class NwbApi:
 
 #     __slots__ = ('path', '_nwbfile')
 

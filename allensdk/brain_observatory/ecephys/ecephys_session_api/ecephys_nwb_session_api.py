@@ -8,9 +8,9 @@ import xarray as xr
 import pynwb
 
 from .ecephys_session_api import EcephysSessionApi
-from allensdk.brain_observatory.nwb.nwb_api import NwbApi
-import \
-    allensdk.brain_observatory.ecephys.nwb  # noqa Necessary to import pyNWB
+# ! from allensdk.brain_observatory.nwb.nwb_api import NwbApi
+# ! import \
+    # allensdk.brain_observatory.ecephys.nwb  # noqa Necessary to import pyNWB
 # namespaces
 from allensdk.brain_observatory.ecephys import get_unit_filter_value
 from allensdk.brain_observatory.nwb import check_nwbfile_version
